@@ -207,12 +207,13 @@ def emit_compilepkg(
         _run_nogo(
             go,
             sources = sources,
+            cgo_go_srcs = cgo_go_srcs_for_nogo,
             importpath = importpath,
             importmap = importmap,
             archives = archives + ([cover_archive] if cover_archive else []),
             recompile_internal_deps = recompile_internal_deps,
             cover_mode = cover_mode,
-            cgo_go_srcs = cgo_go_srcs_for_nogo,
+            testfilter = testfilter,
             out_facts = out_facts,
             out_log = out_nogo_log,
             out_validation = out_nogo_validation,
@@ -223,12 +224,13 @@ def _run_nogo(
         go,
         *,
         sources,
+        cgo_go_srcs,
         importpath,
         importmap,
         archives,
         recompile_internal_deps,
         cover_mode,
-        cgo_go_srcs,
+        testfilter,
         out_facts,
         out_log,
         out_validation,
@@ -256,7 +258,10 @@ def _run_nogo(
         args.add("-importpath", go.label.name)
     if importmap:
         args.add("-p", importmap)
+
     args.add("-package_list", go.package_list)
+    if testfilter:
+        args.add("-testfilter", testfilter)
 
     args.add_all(archives, before_each = "-facts", map_each = _facts)
     args.add("-out_facts", out_facts)
