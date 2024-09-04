@@ -246,7 +246,7 @@ def _run_nogo(
     args.add_all(sources, before_each = "-src")
     if cgo_go_srcs:
         inputs.append(cgo_go_srcs)
-        args.add_all([cgo_go_srcs], before_each = "-src")
+        args.add_all([cgo_go_srcs], before_each = "-ignore_src")
     if cover_mode:
         args.add("-cover_mode", cover_mode)
     if recompile_internal_deps:
