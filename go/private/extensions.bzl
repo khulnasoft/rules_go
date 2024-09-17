@@ -15,6 +15,7 @@
 load("@io_bazel_rules_go_bazel_features//:features.bzl", "bazel_features")
 load("//go/private:nogo.bzl", "DEFAULT_NOGO", "NOGO_DEFAULT_EXCLUDES", "NOGO_DEFAULT_INCLUDES", "go_register_nogo")
 load("//go/private:sdk.bzl", "detect_host_platform", "go_download_sdk_rule", "go_host_sdk_rule", "go_multiple_toolchains")
+load("//go/private/extensions:go_mod.bzl", "sdk_from_go_mod")
 
 def host_compatible_toolchain_impl(ctx):
     ctx.file("BUILD.bazel")
@@ -48,21 +49,32 @@ _COMMON_ATTRS = {
     ),
 }
 
-_download_tag = tag_class(
-    attrs = _COMMON_ATTRS | {
-        "goos": attr.string(),
-        "goarch": attr.string(),
-        "sdks": attr.string_list_dict(),
-        "urls": attr.string_list(default = ["https://dl.google.com/go/{}"]),
-        "patches": attr.label_list(
-            doc = "A list of patches to apply to the SDK after downloading it",
+_from_file_tag = tag_class(
+    attrs = {
+        "go_mod": attr.label(
+            mandatory = True,
+            doc = "The go.mod file to read Go SDK information from",
         ),
-        "patch_strip": attr.int(
-            default = 0,
-            doc = "The number of leading path segments to be stripped from the file name in the patches.",
-        ),
-        "strip_prefix": attr.string(default = "go"),
     },
+)
+
+_DOWNLOAD_ATTRS = _COMMON_ATTRS | {
+    "goos": attr.string(),
+    "goarch": attr.string(),
+    "sdks": attr.string_list_dict(),
+    "urls": attr.string_list(default = ["https://dl.google.com/go/{}"]),
+    "patches": attr.label_list(
+        doc = "A list of patches to apply to the SDK after downloading it",
+    ),
+    "patch_strip": attr.int(
+        default = 0,
+        doc = "The number of leading path segments to be stripped from the file name in the patches.",
+    ),
+    "strip_prefix": attr.string(default = "go"),
+}
+
+_download_tag = tag_class(
+    attrs = _DOWNLOAD_ATTRS,
 )
 
 _host_tag = tag_class(
@@ -160,7 +172,7 @@ def _go_sdk_impl(ctx):
     host_detected_goos, host_detected_goarch = detect_host_platform(ctx)
     toolchains = []
     for module in ctx.modules:
-        for index, download_tag in enumerate(module.tags.download):
+        for index, download_tag in enumerate(_get_download_tags(ctx, module.tags)):
             # SDKs without an explicit version are fetched even when not selected by toolchain
             # resolution. This is acceptable if brought in by the root module, but transitive
             # dependencies should not slow down the build in this way.
@@ -299,6 +311,23 @@ def _go_sdk_impl(ctx):
     else:
         return None
 
+def _get_download_tags(ctx, tags):
+    download_tags = tags.download
+    if tags.from_file:
+        if len(tags.from_file) > 1:
+            fail("go_sdk: only one tag can be specified per module, got:\n", *[t for p in zip(tags.from_file, len(tags.from_file) * ["\n"]) for t in p])
+        from_file_tag = tags.from_file[0]
+        versions = sdk_from_go_mod(ctx, from_file_tag.go_mod)
+        download_tag_attrs = {k: None for k in _DOWNLOAD_ATTRS.keys()}
+        download_tag_attrs["version"] = versions.toolchain.removeprefix("go") if versions.toolchain else versions.go
+        download_tag_attrs["language_version"] = versions.go
+
+        # Required by go_multiple_toolchains.
+        download_tag_attrs["goos"] = ""
+        download_tag_attrs["goarch"] = ""
+        download_tags = [struct(**download_tag_attrs)] + download_tags
+    return download_tags
+
 def _default_go_sdk_name(*, module, multi_version, tag_type, index, suffix = ""):
     # Keep the version out of the repository name if possible to prevent unnecessary rebuilds when
     # it changes.
@@ -335,6 +364,7 @@ go_sdk_extra_kwargs = {
 go_sdk = module_extension(
     implementation = _go_sdk_impl,
     tag_classes = {
+        "from_file": _from_file_tag,
         "download": _download_tag,
         "host": _host_tag,
         "nogo": _nogo_tag,
