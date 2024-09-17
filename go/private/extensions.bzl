@@ -35,17 +35,25 @@ host_compatible_toolchain = repository_rule(
     doc = "An external repository to expose the first host compatible toolchain",
 )
 
+_COMMON_ATTRS = {
+    "name": attr.string(),
+    "version": attr.string(
+        doc = "The version of the Go SDK (e.g. \"1.22.3\")",
+    ),
+    "language_version": attr.string(
+        doc = "The version of the Go language to use (e.g. \"1.22.3\"). If not set, this defaults to the SDK version.",
+    ),
+    "experiments": attr.string_list(
+        doc = "Go experiments to enable via GOEXPERIMENT",
+    ),
+}
+
 _download_tag = tag_class(
-    attrs = {
-        "name": attr.string(),
+    attrs = _COMMON_ATTRS | {
         "goos": attr.string(),
         "goarch": attr.string(),
         "sdks": attr.string_list_dict(),
-        "experiments": attr.string_list(
-            doc = "Go experiments to enable via GOEXPERIMENT",
-        ),
         "urls": attr.string_list(default = ["https://dl.google.com/go/{}"]),
-        "version": attr.string(),
         "patches": attr.label_list(
             doc = "A list of patches to apply to the SDK after downloading it",
         ),
@@ -58,13 +66,7 @@ _download_tag = tag_class(
 )
 
 _host_tag = tag_class(
-    attrs = {
-        "name": attr.string(),
-        "version": attr.string(),
-        "experiments": attr.string_list(
-            doc = "Go experiments to enable via GOEXPERIMENT",
-        ),
-    },
+    attrs = _COMMON_ATTRS,
 )
 
 _nogo_tag = tag_class(
@@ -189,6 +191,7 @@ def _go_sdk_impl(ctx):
                 patch_strip = download_tag.patch_strip,
                 urls = download_tag.urls,
                 version = download_tag.version,
+                language_version = download_tag.language_version,
                 strip_prefix = download_tag.strip_prefix,
             )
 
@@ -229,6 +232,7 @@ def _go_sdk_impl(ctx):
                         sdks = download_tag.sdks,
                         urls = download_tag.urls,
                         version = download_tag.version,
+                        language_version = download_tag.language_version,
                     )
 
                     toolchains.append(struct(
@@ -255,6 +259,7 @@ def _go_sdk_impl(ctx):
             go_host_sdk_rule(
                 name = name,
                 version = host_tag.version,
+                language_version = host_tag.language_version,
                 experiments = host_tag.experiments,
             )
 

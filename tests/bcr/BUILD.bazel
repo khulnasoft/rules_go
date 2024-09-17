@@ -37,6 +37,11 @@ go_test(
     srcs = ["sdk_patch_test.go"],
 )
 
+go_test(
+    name = "language_version_test",
+    srcs = ["language_version_test.go"],
+)
+
 go_library(
     name = "mockable",
     srcs = ["mockable.go"],

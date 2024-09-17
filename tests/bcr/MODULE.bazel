@@ -27,6 +27,7 @@ bazel_dep(name = "toolchains_protoc", version = "0.2.1")
 
 go_sdk = use_extension("@my_rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(
+    language_version = "1.21",
     patch_strip = 1,
     patches = [
         "//:test_go_sdk.patch",
